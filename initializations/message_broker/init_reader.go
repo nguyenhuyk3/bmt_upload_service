@@ -6,7 +6,6 @@ import (
 	s3service "bmt_upload_service/internal/aws_services/s3_service"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/segmentio/kafka-go"
@@ -61,7 +60,7 @@ func processMessage(topic string, value []byte) {
 			log.Printf("failed to unmarshal video message: %v\n", err)
 			return
 		}
-		fmt.Println(uploadMessage)
+
 		handleVideoUpload(uploadMessage)
 
 	default:

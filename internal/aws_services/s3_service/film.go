@@ -61,9 +61,10 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) error {
 		return fmt.Errorf("reading file err: %v", err)
 	}
 
+	objectKey := film_image_base_key + filepath.Base(message.ImageUrl)
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
-		Key:         aws.String(film_image_base_key + filepath.Base(message.ImageUrl)),
+		Key:         aws.String(objectKey),
 		Body:        bytes.NewReader(fileBytes),
 		ContentType: aws.String("image/jpeg"),
 	})
@@ -81,7 +82,7 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
 
 	file, err := os.Open(message.VideoUrl)
 	if err != nil {
-		return fmt.Errorf("cann't open file: %v", err)
+		return fmt.Errorf("can't open file: %v", err)
 	}
 	defer file.Close()
 
@@ -97,9 +98,10 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
 		mimeType = "application/octet-stream"
 	}
 
+	objectKey := film_video_base_key + filepath.Base(message.VideoUrl)
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
-		Key:         aws.String(film_video_base_key + filepath.Base(message.VideoUrl)),
+		Key:         aws.String(objectKey),
 		Body:        bytes.NewReader(fileBytes),
 		ContentType: aws.String(mimeType),
 	})
