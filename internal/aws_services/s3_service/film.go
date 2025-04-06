@@ -9,6 +9,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -21,10 +22,37 @@ const (
 	film_video_base_key = "film-videos/"
 )
 
+var (
+	once sync.Once
+	// s3Session *session.Session
+	s3Client *s3.S3
+)
+
+func initS3Client() {
+	once.Do(func() {
+		s3Session, err := session.NewSession(&aws.Config{
+			Region: aws.String(global.Config.ServiceSetting.S3Setting.AwsRegion),
+			Credentials: credentials.NewStaticCredentials(
+				global.Config.ServiceSetting.S3Setting.AwsAccessKeyId,
+				global.Config.ServiceSetting.S3Setting.AwsSercetAccessKeyId,
+				""),
+		})
+		if err != nil {
+			panic(fmt.Sprintf("failed to create AWS session: %v", err))
+		}
+
+		s3Client = s3.New(s3Session)
+	})
+}
+
 func UploadFilmImageToS3(message messages.UploadImageMessage) error {
+	if s3Client == nil {
+		initS3Client()
+	}
+
 	file, err := os.Open(message.ImageUrl)
 	if err != nil {
-		return fmt.Errorf("cann't open file: %v", err)
+		return fmt.Errorf("can't open file: %v", err)
 	}
 	defer file.Close()
 
@@ -33,26 +61,12 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) error {
 		return fmt.Errorf("reading file err: %v", err)
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(global.Config.ServiceSetting.S3Setting.AwsRegion),
-		Credentials: credentials.NewStaticCredentials(
-			global.Config.ServiceSetting.S3Setting.AwsAccessKeyId,
-			global.Config.ServiceSetting.S3Setting.AwsSercetAccessKeyId,
-			""),
-	})
-	if err != nil {
-		return fmt.Errorf("connecting AWS err: %v", err)
-	}
-
-	svc := s3.New(sess)
-
-	_, err = svc.PutObject(&s3.PutObjectInput{
+	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
-		Key:         aws.String(film_image_base_key + message.ImageUrl),
+		Key:         aws.String(film_image_base_key + filepath.Base(message.ImageUrl)),
 		Body:        bytes.NewReader(fileBytes),
 		ContentType: aws.String("image/jpeg"),
 	})
-
 	if err != nil {
 		return fmt.Errorf("upload to S3 (image) failure: %v", err)
 	}
@@ -61,6 +75,10 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) error {
 }
 
 func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
+	if s3Client == nil {
+		initS3Client()
+	}
+
 	file, err := os.Open(message.VideoUrl)
 	if err != nil {
 		return fmt.Errorf("cann't open file: %v", err)
@@ -71,35 +89,20 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
 	if err != nil {
 		return fmt.Errorf("reading file err: %v", err)
 	}
-
-	// Lấy phần mở rộng file (ví dụ: ".mp4")
+	// Get the file extension (eg ".mp4")
 	ext := filepath.Ext(message.VideoUrl)
-	// Xác định MIME type (ví dụ: "video/mp4")
+	// Specify the MIME type (eg "video/mp4")
 	mimeType := mime.TypeByExtension(ext)
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(global.Config.ServiceSetting.S3Setting.AwsRegion),
-		Credentials: credentials.NewStaticCredentials(
-			global.Config.ServiceSetting.S3Setting.AwsAccessKeyId,
-			global.Config.ServiceSetting.S3Setting.AwsSercetAccessKeyId,
-			""),
-	})
-	if err != nil {
-		return fmt.Errorf("connecting AWS err: %v", err)
-	}
-
-	svc := s3.New(sess)
-
-	_, err = svc.PutObject(&s3.PutObjectInput{
+	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
-		Key:         aws.String(film_video_base_key + message.VideoUrl),
+		Key:         aws.String(film_video_base_key + filepath.Base(message.VideoUrl)),
 		Body:        bytes.NewReader(fileBytes),
 		ContentType: aws.String(mimeType),
 	})
-
 	if err != nil {
 		return fmt.Errorf("upload to S3 (video) failure: %v", err)
 	}
