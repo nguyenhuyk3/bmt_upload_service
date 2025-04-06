@@ -69,19 +69,40 @@ func processMessage(topic string, value []byte) {
 }
 
 func handleImageUpload(message messages.UploadImageMessage) {
-	err := s3service.UploadFilmImageToS3(message)
+	objectKey, err := s3service.UploadFilmImageToS3(message)
 	if err != nil {
 		log.Printf("failed to upload image: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded image for ProductID: %s\n", message.ProductId)
+
+		topic := global.RETURNED_IMAGE_OBJECT_KEY_TOPIC
+		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
+		if err != nil {
+			log.Printf("failed to send message to Kafka (%s): %v", topic, err)
+		}
 	}
 }
 
 func handleVideoUpload(message messages.UploadVideoMessage) {
-	err := s3service.UploadFilmVideoToS3(message)
+	objectKey, err := s3service.UploadFilmVideoToS3(message)
 	if err != nil {
 		log.Printf("failed to upload video: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded video for ProductID: %s\n", message.ProductId)
+
+		topic := global.RETURNED_VIDEO_OBJECT_KEY_TOPIC
+		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
+		if err != nil {
+			log.Printf("failed to send message to Kafka (%s): %v", topic, err)
+		}
 	}
+}
+
+func sendReturnedObjectKey(topic,
+	productId, objectKey string) error {
+	return SendMessage(topic,
+		topic,
+		messages.ReturnedObjectKeyMessage{
+			ProductId: productId,
+			ObjectKey: objectKey})
 }

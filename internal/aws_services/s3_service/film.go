@@ -45,20 +45,20 @@ func initS3Client() {
 	})
 }
 
-func UploadFilmImageToS3(message messages.UploadImageMessage) error {
+func UploadFilmImageToS3(message messages.UploadImageMessage) (string, error) {
 	if s3Client == nil {
 		initS3Client()
 	}
 
 	file, err := os.Open(message.ImageUrl)
 	if err != nil {
-		return fmt.Errorf("can't open file: %v", err)
+		return "", fmt.Errorf("can't open file: %v", err)
 	}
 	defer file.Close()
 
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("reading file err: %v", err)
+		return "", fmt.Errorf("reading file err: %v", err)
 	}
 
 	objectKey := film_image_base_key + filepath.Base(message.ImageUrl)
@@ -69,26 +69,32 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) error {
 		ContentType: aws.String("image/jpeg"),
 	})
 	if err != nil {
-		return fmt.Errorf("upload to S3 (image) failure: %v", err)
+		return "", fmt.Errorf("upload to S3 (image) failure: %v", err)
 	}
 
-	return nil
+	// err = messagebroker.SendMessage(global.RETURNED_IMAGE_OBJECT_KEY_TOPIC,
+	// 	global.RETURNED_IMAGE_OBJECT_KEY_TOPIC,
+	// 	messages.UploadImageMessage{
+	// 		ProductId: message.ProductId,
+	// 		ImageUrl:  objectKey})
+
+	return objectKey, nil
 }
 
-func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
+func UploadFilmVideoToS3(message messages.UploadVideoMessage) (string, error) {
 	if s3Client == nil {
 		initS3Client()
 	}
 
 	file, err := os.Open(message.VideoUrl)
 	if err != nil {
-		return fmt.Errorf("can't open file: %v", err)
+		return "", fmt.Errorf("can't open file: %v", err)
 	}
 	defer file.Close()
 
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("reading file err: %v", err)
+		return "", fmt.Errorf("reading file err: %v", err)
 	}
 	// Get the file extension (eg ".mp4")
 	ext := filepath.Ext(message.VideoUrl)
@@ -106,8 +112,8 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) error {
 		ContentType: aws.String(mimeType),
 	})
 	if err != nil {
-		return fmt.Errorf("upload to S3 (video) failure: %v", err)
+		return "", fmt.Errorf("upload to S3 (video) failure: %v", err)
 	}
 
-	return nil
+	return objectKey, nil
 }
