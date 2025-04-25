@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/google/uuid"
 )
 
 const (
@@ -61,7 +62,14 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) (string, error) {
 		return "", fmt.Errorf("reading file err: %v", err)
 	}
 
-	objectKey := film_image_base_key + filepath.Base(message.ImageUrl)
+	ext := filepath.Ext(message.ImageUrl)
+	if ext == "" {
+		ext = ".jpg"
+	}
+
+	newFileName := uuid.New().String() + ext
+
+	objectKey := film_image_base_key + newFileName
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
 		Key:         aws.String(objectKey),
@@ -72,13 +80,11 @@ func UploadFilmImageToS3(message messages.UploadImageMessage) (string, error) {
 		return "", fmt.Errorf("upload to S3 (image) failure: %v", err)
 	}
 
-	// err = messagebroker.SendMessage(global.RETURNED_IMAGE_OBJECT_KEY_TOPIC,
-	// 	global.RETURNED_IMAGE_OBJECT_KEY_TOPIC,
-	// 	messages.UploadImageMessage{
-	// 		ProductId: message.ProductId,
-	// 		ImageUrl:  objectKey})
-
-	return objectKey, nil
+	return fmt.Sprintf("https://%s.%s/%s",
+		global.Config.ServiceSetting.S3Setting.FilmBucketName,
+		global.Config.ServiceSetting.S3Setting.AwsRegion,
+		objectKey,
+	), nil
 }
 
 func UploadFilmVideoToS3(message messages.UploadVideoMessage) (string, error) {
@@ -104,7 +110,9 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) (string, error) {
 		mimeType = "application/octet-stream"
 	}
 
-	objectKey := film_video_base_key + filepath.Base(message.VideoUrl)
+	newFileName := uuid.New().String() + ext
+	objectKey := film_video_base_key + newFileName
+
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(global.Config.ServiceSetting.S3Setting.FilmBucketName),
 		Key:         aws.String(objectKey),
@@ -115,5 +123,9 @@ func UploadFilmVideoToS3(message messages.UploadVideoMessage) (string, error) {
 		return "", fmt.Errorf("upload to S3 (video) failure: %v", err)
 	}
 
-	return objectKey, nil
+	return fmt.Sprintf("https://%s.%s/%s",
+		global.Config.ServiceSetting.S3Setting.FilmBucketName,
+		global.Config.ServiceSetting.S3Setting.AwsRegion,
+		objectKey,
+	), nil
 }

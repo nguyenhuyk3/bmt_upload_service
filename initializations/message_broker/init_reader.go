@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -26,9 +27,10 @@ func InitReaders() {
 
 func startReader(topic string) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1},
-		GroupID: global.UPLOAD_SERVICE_GROUP,
-		Topic:   topic,
+		Brokers:        []string{global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1},
+		GroupID:        global.UPLOAD_SERVICE_GROUP,
+		Topic:          topic,
+		CommitInterval: time.Second * 5,
 	})
 	defer reader.Close()
 
@@ -74,11 +76,13 @@ func handleImageUpload(message messages.UploadImageMessage) {
 		log.Printf("failed to upload image: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded image for ProductID: %s\n", message.ProductId)
-
+		// Retry send message to topic with 3 times
 		topic := global.RETURNED_IMAGE_OBJECT_KEY_TOPIC
 		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
 		if err != nil {
-			log.Printf("failed to send message to Kafka (%s): %v", topic, err)
+			log.Printf("failed to send message to Kafka (%s): %\n", topic, err)
+		} else {
+			log.Printf("send message to (%s) topic\n", topic)
 		}
 	}
 }
@@ -89,11 +93,13 @@ func handleVideoUpload(message messages.UploadVideoMessage) {
 		log.Printf("failed to upload video: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded video for ProductID: %s\n", message.ProductId)
-
+		// Retry send message to topic with 3 times
 		topic := global.RETURNED_VIDEO_OBJECT_KEY_TOPIC
 		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
 		if err != nil {
-			log.Printf("failed to send message to Kafka (%s): %v", topic, err)
+			log.Printf("failed to send message to Kafka (%s): %v\n", topic, err)
+		} else {
+			log.Printf("send message to (%s) topic\n", topic)
 		}
 	}
 }

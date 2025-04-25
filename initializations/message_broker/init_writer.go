@@ -23,7 +23,10 @@ func initKafkaWriter() {
 		writer = &kafka.Writer{
 			Addr:         kafka.TCP(global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1),
 			Balancer:     &kafka.LeastBytes{},
-			BatchTimeout: 500 * time.Millisecond,
+			BatchTimeout: 1 * time.Millisecond,
+			MaxAttempts:  3,
+			BatchSize:    100,
+			WriteTimeout: 5 * time.Second,
 		}
 	})
 }
@@ -43,8 +46,9 @@ func ensureTopicExists(topic string) error {
 
 	return conn.CreateTopics(kafka.TopicConfig{
 		Topic:             topic,
-		NumPartitions:     1,
+		NumPartitions:     3,
 		ReplicationFactor: 1,
+		ConfigEntries:     []kafka.ConfigEntry{},
 	})
 }
 
