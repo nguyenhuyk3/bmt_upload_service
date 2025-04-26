@@ -1,9 +1,8 @@
-package messagebroker
+package readers
 
 import (
 	"bmt_upload_service/dto/messages"
 	"bmt_upload_service/global"
-	s3service "bmt_upload_service/internal/aws_services/s3_service"
 	"context"
 	"encoding/json"
 	"log"
@@ -12,22 +11,13 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-var topics = []string{
-	global.UPLOAD_IMAGE_TOPIC,
-	global.UPLOAD_VIDEO_TOPIC,
-}
-
-func InitReaders() {
-	log.Println("=============== Upload Service is listening for messages... ===============")
-
-	for _, topic := range topics {
-		go startReader(topic)
-	}
-}
-
-func startReader(topic string) {
+func (r *Reader) startReader(topic string) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        []string{global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1},
+		Brokers: []string{
+			global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1,
+			global.Config.ServiceSetting.KafkaSetting.KafkaBroker_2,
+			global.Config.ServiceSetting.KafkaSetting.KafkaBroker_3,
+		},
 		GroupID:        global.UPLOAD_SERVICE_GROUP,
 		Topic:          topic,
 		CommitInterval: time.Second * 5,
@@ -41,12 +31,13 @@ func startReader(topic string) {
 			continue
 		}
 
-		processMessage(topic, message.Value)
+		r.processMessage(topic, message.Value)
 	}
 }
 
-func processMessage(topic string, value []byte) {
+func (r *Reader) processMessage(topic string, value []byte) {
 	switch topic {
+	// Handle uploading image
 	case global.UPLOAD_IMAGE_TOPIC:
 		var uploadMessage messages.UploadImageMessage
 		if err := json.Unmarshal(value, &uploadMessage); err != nil {
@@ -54,8 +45,9 @@ func processMessage(topic string, value []byte) {
 			return
 		}
 
-		handleImageUpload(uploadMessage)
+		r.handleImageUpload(uploadMessage)
 
+	// Handle uploading video
 	case global.UPLOAD_VIDEO_TOPIC:
 		var uploadMessage messages.UploadVideoMessage
 		if err := json.Unmarshal(value, &uploadMessage); err != nil {
@@ -63,22 +55,22 @@ func processMessage(topic string, value []byte) {
 			return
 		}
 
-		handleVideoUpload(uploadMessage)
+		r.handleVideoUpload(uploadMessage)
 
 	default:
 		log.Printf("unknown topic received: %s\n", topic)
 	}
 }
 
-func handleImageUpload(message messages.UploadImageMessage) {
-	objectKey, err := s3service.UploadFilmImageToS3(message)
+func (r *Reader) handleImageUpload(message messages.UploadImageMessage) {
+	objectKey, err := r.UploadService.UploadFilmImageToS3(message)
 	if err != nil {
 		log.Printf("failed to upload image: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded image for ProductID: %s\n", message.ProductId)
-		// Retry send message to topic with 3 times
+
 		topic := global.RETURNED_IMAGE_OBJECT_KEY_TOPIC
-		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
+		err = r.sendReturnedObjectKey(topic, message.ProductId, objectKey)
 		if err != nil {
 			log.Printf("failed to send message to Kafka (%s): %\n", topic, err)
 		} else {
@@ -87,15 +79,15 @@ func handleImageUpload(message messages.UploadImageMessage) {
 	}
 }
 
-func handleVideoUpload(message messages.UploadVideoMessage) {
-	objectKey, err := s3service.UploadFilmVideoToS3(message)
+func (r *Reader) handleVideoUpload(message messages.UploadVideoMessage) {
+	objectKey, err := r.UploadService.UploadFilmVideoToS3(message)
 	if err != nil {
 		log.Printf("failed to upload video: %v\n", err)
 	} else {
 		log.Printf("successfully uploaded video for ProductID: %s\n", message.ProductId)
-		// Retry send message to topic with 3 times
+
 		topic := global.RETURNED_VIDEO_OBJECT_KEY_TOPIC
-		err = sendReturnedObjectKey(topic, message.ProductId, objectKey)
+		err = r.sendReturnedObjectKey(topic, message.ProductId, objectKey)
 		if err != nil {
 			log.Printf("failed to send message to Kafka (%s): %v\n", topic, err)
 		} else {
@@ -104,9 +96,9 @@ func handleVideoUpload(message messages.UploadVideoMessage) {
 	}
 }
 
-func sendReturnedObjectKey(topic,
+func (r *Reader) sendReturnedObjectKey(topic,
 	productId, objectKey string) error {
-	return SendMessage(topic,
+	return r.Writer.SendMessage(topic,
 		topic,
 		messages.ReturnedObjectKeyMessage{
 			ProductId: productId,

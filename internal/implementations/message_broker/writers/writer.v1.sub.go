@@ -1,11 +1,8 @@
-package messagebroker
+package writers
 
 import (
 	"bmt_upload_service/global"
-	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -21,7 +18,11 @@ var (
 func initKafkaWriter() {
 	once.Do(func() {
 		writer = &kafka.Writer{
-			Addr:         kafka.TCP(global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1),
+			Addr: kafka.TCP(
+				global.Config.ServiceSetting.KafkaSetting.KafkaBroker_1,
+				global.Config.ServiceSetting.KafkaSetting.KafkaBroker_2,
+				global.Config.ServiceSetting.KafkaSetting.KafkaBroker_3,
+			),
 			Balancer:     &kafka.LeastBytes{},
 			BatchTimeout: 1 * time.Millisecond,
 			MaxAttempts:  3,
@@ -50,42 +51,4 @@ func ensureTopicExists(topic string) error {
 		ReplicationFactor: 1,
 		ConfigEntries:     []kafka.ConfigEntry{},
 	})
-}
-
-func SendMessage(topic string, key string, value interface{}) error {
-	if writer == nil {
-		initKafkaWriter()
-	}
-
-	if err := ensureTopicExists(topic); err != nil {
-		log.Printf("failed to ensure topic exists: %v", err)
-		return err
-	}
-
-	msgBytes, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-
-	err = writer.WriteMessages(context.Background(), kafka.Message{
-		Topic: topic,
-		Key:   []byte(key),
-		Value: msgBytes,
-	})
-	if err != nil {
-		log.Printf("failed to send message to Kafka: %v", err)
-		return err
-	}
-
-	// log.Printf("message sent to Kafka topic %s", topic)
-	return nil
-}
-
-func Close() {
-	if writer != nil {
-		writer.Close()
-		log.Println("kafka producer closed")
-	}
-
-	close(closeCh)
 }
