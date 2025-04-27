@@ -12,6 +12,7 @@ type serviceSetting struct {
 
 type serverSetting struct {
 	ServerPort string `mapstructure:"SERVER_PORT"`
+	SQSUrl     string `mapstructure:"SQS_QUEUE_URL"`
 }
 
 type kafkaSetting struct {
