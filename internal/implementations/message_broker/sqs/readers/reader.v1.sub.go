@@ -36,6 +36,15 @@ func generateObjectURL(bucketName, region, objectKey string) string {
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey)
 }
 
+func extractPrefix(path string) string {
+	i := strings.Index(path, "/")
+	if i == -1 {
+		return ""
+	}
+
+	return path[:i+1]
+}
+
 func (sr *SQSReader) deleteMessage(msg sqstypes.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
