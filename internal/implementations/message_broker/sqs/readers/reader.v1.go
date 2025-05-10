@@ -64,12 +64,21 @@ func (sr *SQSReader) IniSQSReader() {
 		}
 
 		for _, msg := range out.Messages {
+			var snsMessage map[string]interface{}
+			if err := json.Unmarshal([]byte(*msg.Body), &snsMessage); err != nil {
+				log.Printf("invalid JSON in SNS message: %v", err)
+				continue
+			}
+
+			messageStr, ok := snsMessage["Message"].(string)
+			if !ok {
+				log.Printf("invalid Message format in SNS notification")
+				continue
+			}
+
 			var evt messages.S3Event
-			if err := json.Unmarshal([]byte(*msg.Body), &evt); err != nil {
-				log.Printf("invalid JSON: %v", err)
-
-				// sr.deleteMessage(msg)
-
+			if err := json.Unmarshal([]byte(messageStr), &evt); err != nil {
+				log.Printf("invalid JSON in S3 event message: %v", err)
 				continue
 			}
 
