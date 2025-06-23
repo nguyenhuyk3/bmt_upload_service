@@ -28,7 +28,9 @@ const (
 func NewSQSReader(
 	queueURL string,
 	writer services.IMessageBrokerWriter) *SQSReader {
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(
+		context.Background(),
+		config.WithRegion(global.Config.Server.AWSRegion))
 	if err != nil {
 		log.Fatalf("unable to load AWS SDK config: %v", err)
 	}
@@ -45,12 +47,13 @@ func NewSQSReader(
 func (sr *SQSReader) IniSQSReader() {
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		out, err := sr.SQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-			QueueUrl:            &sr.QueueURL,
-			MaxNumberOfMessages: 10,
-			WaitTimeSeconds:     20,
-			VisibilityTimeout:   30,
-		})
+		out, err := sr.SQSClient.ReceiveMessage(ctx,
+			&sqs.ReceiveMessageInput{
+				QueueUrl:            &sr.QueueURL,
+				MaxNumberOfMessages: 10,
+				WaitTimeSeconds:     20,
+				VisibilityTimeout:   30,
+			})
 		cancel()
 
 		if err != nil {
@@ -121,17 +124,20 @@ func (sr *SQSReader) IniSQSReader() {
 						}
 
 						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-						err = sr.Writer.SendMessage(ctx, topic, productId, messages.ReturnedObjectKeyMessage{
-							ProductId: productId,
-							ObjectKey: objectURL,
-						})
+						err = sr.Writer.SendMessage(ctx, topic, productId,
+							messages.ReturnedObjectKeyMessage{
+								ProductId: productId,
+								ObjectKey: objectURL,
+							})
 						cancel()
 
 						if err != nil {
-							log.Printf("error sending message to Kafka (film) (%s): %v", ext, err)
+							log.Printf("error sending message to Kafka (film - %s) with product id (%s): %v", keyPrefix, productId, err)
 							continue
 						} else {
-							log.Printf("send message to kafka sucessfully (film): %s", productId)
+							log.Printf("send message to kafka sucessfully (film - %s): %s", keyPrefix, productId)
+
+							sr.deleteMessage(msg)
 						}
 					case fab_image_base_ket:
 						productId, _, err := parseKey(data.S3.Object.Key)
@@ -147,17 +153,20 @@ func (sr *SQSReader) IniSQSReader() {
 						topic := global.RETURNED_FAB_IMAGE_OBJECT_KEY_TOPIC
 
 						ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-						err = sr.Writer.SendMessage(ctx, topic, productId, messages.ReturnedObjectKeyMessage{
-							ProductId: productId,
-							ObjectKey: objectURL,
-						})
+						err = sr.Writer.SendMessage(ctx, topic, productId,
+							messages.ReturnedObjectKeyMessage{
+								ProductId: productId,
+								ObjectKey: objectURL,
+							})
 						cancel()
 
 						if err != nil {
-							log.Printf("error sending message to Kafka (fab): %v", err)
+							log.Printf("error sending message to Kafka (fab - %s) with product id (%s): %v", keyPrefix, productId, err)
 							continue
 						} else {
-							log.Printf("send message to kafka sucessfully (fab): %s", productId)
+							log.Printf("send message to kafka sucessfully (fab - %s) with product id: %s", keyPrefix, productId)
+
+							sr.deleteMessage(msg)
 						}
 					default:
 						log.Printf("invalid prefix: %s", keyPrefix)

@@ -8,7 +8,7 @@ import (
 
 func initSQSQueue() {
 	kafkaWriter := writers.NewKafkaWriter()
-	sqsReader := readers.NewSQSReader(global.Config.Server.SQSUrl, kafkaWriter)
+	sqsReader := readers.NewSQSReader(global.Config.ServiceSetting.SQSSeting.QueueURL, kafkaWriter)
 
 	sqsReader.IniSQSReader()
 

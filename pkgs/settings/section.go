@@ -8,11 +8,13 @@ type Config struct {
 type serviceSetting struct {
 	KafkaSetting kafkaSetting `mapstructure:"kafka"`
 	S3Setting    s3Setting    `mapstructure:"s3"`
+	SQSSeting    sqsSetting   `mapstructure:"sqs"`
 }
 
 type serverSetting struct {
 	ServerPort string `mapstructure:"SERVER_PORT"`
 	SQSUrl     string `mapstructure:"SQS_QUEUE_URL"`
+	AWSRegion  string `mapstructure:"AWS_REGION"`
 }
 
 type kafkaSetting struct {
@@ -26,4 +28,8 @@ type s3Setting struct {
 	AwsSercetAccessKeyId string `mapstructure:"aws_sercet_access_key_id"`
 	AwsRegion            string `mapstructure:"aws_region"`
 	FilmBucketName       string `mapstructure:"film_bucket_name"`
+}
+
+type sqsSetting struct {
+	QueueURL string `mapstructure:"queue_url"`
 }
